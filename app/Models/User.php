@@ -2,14 +2,19 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\UserRole;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -20,6 +25,9 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
+        'manager_id',
+        'is_active',
     ];
 
     /**
@@ -41,7 +49,68 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password'          => 'hashed',
+            'role'              => UserRole::class,
+            'is_active'         => 'boolean',
         ];
+    }
+
+    // ---------- Relationships ----------
+
+    // A developer's manager (self reference)
+    public function manager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manager_id');
+    }
+
+    // Developers working under this manager
+    public function developers(): HasMany
+    {
+        return $this->hasMany(User::class, 'manager_id');
+    }
+
+    // Projects owned by this manager
+    public function managedProjects(): HasMany
+    {
+        return $this->hasMany(Project::class, 'manager_id');
+    }
+
+    // Projects where this user is the specific approver
+    public function approverProjects(): BelongsToMany
+    {
+        return $this->belongsToMany(Project::class, 'project_approvers', 'user_id', 'project_id')
+            ->withTimestamps();
+    }
+
+    public function assignedTasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'assigned_to');
+    }
+
+    public function createdTasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'created_by');
+    }
+
+    // ---------- Helpers ----------
+    public function hasRole(UserRole ...$roles): bool
+    {
+        return in_array($this->role, $roles, true);
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === UserRole::Admin;
+    }
+
+    // ---------- Scopes ----------
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
+    }
+
+    public function scopeWithRole(Builder $query, UserRole $role): Builder
+    {
+        return $query->where('role', $role);
     }
 }
