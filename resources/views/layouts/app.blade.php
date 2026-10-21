@@ -25,6 +25,7 @@
 
             <section class="content">
                 <div class="container-fluid">
+                    @include('partials.alerts')
                     @yield('content')
                 </div>
             </section>

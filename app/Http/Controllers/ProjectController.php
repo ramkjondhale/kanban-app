@@ -2,32 +2,70 @@
 
 namespace App\Http\Controllers;
 
-use App\Support\DummyData;
-use Illuminate\Http\Request;
+use App\Enums\UserRole;
+use App\Enums\TaskStatus;
+use App\Http\Requests\ProjectRequest;
+use App\Models\Project;
+use App\Models\User;
+use App\Services\ProjectService;
 
 class ProjectController extends Controller
 {
+    public function __construct(private ProjectService $projects) {}
+
     public function index()
     {
         return view('projects.index', [
-            'projects' => DummyData::projects(),
+            'projects' => $this->projects->paginate(),
         ]);
     }
 
-    public function show(int $id)
+    public function create()
     {
-        $project = DummyData::find(DummyData::projects(), $id);
-        abort_if($project === null, 404);
+        return view('projects.create', $this->formData(new Project()));
+    }
 
-        $tasks = collect(DummyData::tasks())->where('project_id', $id)->groupBy('status');
+    public function store(ProjectRequest $request)
+    {
+        $project = $this->projects->create($request->validated());
 
-        $columns = [
-            'todo'        => 'To Do',
-            'in_progress' => 'In Progress',
-            'in_review'   => 'In Review',
-            'approved'    => 'Approved',
+        return redirect()->route('projects.show', $project)->with('success', 'Project created.');
+    }
+
+    public function show(Project $project)
+    {
+        return view('projects.show', [
+            'project' => $project->load('manager'),
+            'tasks'   => $this->projects->board($project),
+            'columns' => TaskStatus::cases(),
+        ]);
+    }
+
+    public function edit(Project $project)
+    {
+        return view('projects.edit', $this->formData($project));
+    }
+
+    public function update(ProjectRequest $request, Project $project)
+    {
+        $this->projects->update($project, $request->validated());
+
+        return redirect()->route('projects.show', $project)->with('success', 'Project updated.');
+    }
+
+    public function destroy(Project $project)
+    {
+        $this->projects->delete($project);
+
+        return redirect()->route('projects.index')->with('success', 'Project deleted.');
+    }
+
+    private function formData(Project $project): array
+    {
+        return [
+            'project'    => $project,
+            'managers'   => User::active()->withRole(UserRole::Manager)->orderBy('name')->get(),
+            'developers' => User::active()->withRole(UserRole::Developer)->orderBy('name')->get(),
         ];
-
-        return view('projects.show', compact('project', 'tasks', 'columns'));
     }
 }

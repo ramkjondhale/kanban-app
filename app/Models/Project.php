@@ -48,15 +48,17 @@ class Project extends Model
     }
 
     // Accessor: $project->progress gives a percentage
+    // Uses tasks_count / approved_tasks_count when they were loaded with withCount()
+    // so that a list of projects does not run extra queries per row.
     public function getProgressAttribute(): int
     {
-        $total = $this->tasks()->count();
+        $total = $this->tasks_count ?? $this->tasks()->count();
 
         if ($total === 0) {
             return 0;
         }
 
-        $approved = $this->tasks()->where('status', TaskStatus::Approved)->count();
+        $approved = $this->approved_tasks_count ?? $this->tasks()->where('status', TaskStatus::Approved)->count();
         return (int) round(($approved / $total) * 100);
     }
 }

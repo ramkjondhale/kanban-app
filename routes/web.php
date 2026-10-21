@@ -11,7 +11,7 @@ Route::view('/login', 'auth.login')->name('login');
 
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
-Route::get('/projects/{id}', [ProjectController::class, 'show'])->name('projects.show');
+Route::resource('projects', ProjectController::class);
 
-Route::get('/tasks/{id}', [TaskController::class, 'show'])->name('tasks.show');
+// shallow: create/store need the project in the URL, but show/edit/update/destroy only need the task id
+Route::resource('projects.tasks', TaskController::class)->shallow()->except(['index']);
